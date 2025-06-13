@@ -1,0 +1,13 @@
+<!-- result.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sentiment Analysis Result</title>
+</head>
+<body>
+    <h1>Sentiment Analysis Result</h1>
+    <p>You entered: {{ text }}</p>
+    <p>Prediction: <strong>{{ prediction }}</strong></p>
+    <a href="{% url 'home' %}">Try another</a>
+</body>
+</html>
