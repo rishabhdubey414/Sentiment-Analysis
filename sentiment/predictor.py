@@ -1,41 +1,52 @@
+# sentiment/predictor.py
+
 import os
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import make_pipeline
-import joblib
+import pickle
+from django.conf import settings
 
-# Define paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-emotion_csv_path = os.path.join(BASE_DIR, 'dataset', 'combined_emotion.csv')
-sentiment_csv_path = os.path.join(BASE_DIR, 'dataset', 'combined_sentiment_data.csv')
+from .preprocessing import preprocess_text
 
-# Load datasets
-emotion_df = pd.read_csv("C:\Sentiment Analysis\sentiment\dataset\combined_emotion.csv")
-sentiment_df = pd.read_csv("C:\Sentiment Analysis\sentiment\dataset\combined_sentiment_data.csv")
+# Build absolute path to /sentiment/ml/
+BASE_DIR = settings.BASE_DIR
+ML_DIR = os.path.join(BASE_DIR, "sentiment", "ml")
 
-# Extract features and labels
-X_emotion = emotion_df['sentence']
-y_emotion = emotion_df['emotion']
+MODEL_PATH = os.path.join(ML_DIR, "model.pkl")
+VECTORIZER_PATH = os.path.join(ML_DIR, "vectorizer.pkl")
 
-X_sentiment = sentiment_df['sentence']
-y_sentiment = sentiment_df['sentiment']
+# Load artifacts once at startup
+try:
+    with open(VECTORIZER_PATH, "rb") as f:
+        vectorizer = pickle.load(f)
 
-# Train emotion model
-emotion_model = make_pipeline(TfidfVectorizer(), LogisticRegression(max_iter=1000))
-emotion_model.fit(X_emotion, y_emotion)
+    with open(MODEL_PATH, "rb") as f:
+        model = pickle.load(f)
 
-# Train sentiment model
-sentiment_model = make_pipeline(TfidfVectorizer(), LogisticRegression(max_iter=1000))
-sentiment_model.fit(X_sentiment, y_sentiment)
+    MODEL_LOADED = True
+except Exception as e:
+    # You can log this
+    print(f"[predictor] Error loading model/vectorizer: {e}")
+    vectorizer = None
+    model = None
+    MODEL_LOADED = False
 
 
+def predict_sentiment(text: str) -> str:
+    """
+    Takes raw user text, applies preprocessing, vectorization,
+    and returns the model's predicted label as string.
+    """
+    if not MODEL_LOADED:
+        return "Model not available"
 
-# Prediction function
-def predict_sentiment(text):
-    emotion = emotion_model.predict([text])[0]
-    sentiment = sentiment_model.predict([text])[0]
-    return {
-        'emotion': emotion,
-        'sentiment': sentiment
+    processed = preprocess_text(text)
+    features = vectorizer.transform([processed])
+    prediction = model.predict(features)[0]
+
+    # If your labels are 0/1, map them to strings:
+    label_map = {
+        0: "Negative",
+        1: "Positive"
+        # add more if multi-class
     }
+
+    return label_map.get(prediction, str(prediction))
